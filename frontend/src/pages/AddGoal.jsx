@@ -1,6 +1,22 @@
+import { useState } from "react";
 import { Upload, CalendarDays, Clock3, Target } from "lucide-react";
 
 function AddGoal() {
+  const [goalData, setGoalData] = useState({
+  goal_name: "",
+  goal_type: "Semester Exam",
+  exam_date: "",
+  daily_hours: "",
+  preferred_time: ""
+});
+
+const handleChange = (e) => {
+  setGoalData({
+    ...goalData,
+    [e.target.name]: e.target.value,
+  });
+};
+
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center py-10">
       <div className="w-full max-w-3xl bg-white rounded-2xl shadow-lg p-8">
@@ -21,10 +37,13 @@ function AddGoal() {
           </label>
 
           <input
-            type="text"
-            placeholder="Example: CAT Exam"
-            className="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+  type="text"
+  name="goal_name"
+  value={goalData.goal_name}
+  onChange={handleChange}
+  placeholder="Example: CAT Exam"
+  className="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+/>
         </div>
 
         {/* Goal Type */}
@@ -33,7 +52,12 @@ function AddGoal() {
             Goal Type
           </label>
 
-          <select className="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select
+  name="goal_type"
+  value={goalData.goal_type}
+  onChange={handleChange}
+  className="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+>
             <option>Semester Exam</option>
             <option>Placement</option>
             <option>Competitive Exam</option>
@@ -56,6 +80,9 @@ function AddGoal() {
 
             <input
               type="date"
+               name="exam_date"
+  value={goalData.exam_date}
+  onChange={handleChange}
               className="w-full border rounded-lg p-3 pl-10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -75,6 +102,9 @@ function AddGoal() {
 
             <input
               type="number"
+               name="daily_hours"
+               value={goalData.daily_hours}
+  onChange={handleChange}
               min="1"
               max="12"
               placeholder="3"
@@ -149,6 +179,9 @@ function AddGoal() {
           </ul>
 
         </div>
+        <pre className="mt-6 bg-gray-100 p-4 rounded">
+  {JSON.stringify(goalData, null, 2)}
+</pre>
 
         {/* Button */}
         <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl text-lg font-semibold transition">
