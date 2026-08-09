@@ -21,7 +21,19 @@ def create_goal(
     goal: GoalCreate,
     db: Session = Depends(get_db)
 ):
+    new_goal = Goal(
+        goal_name=goal.goal_name,
+        goal_type=goal.goal_type,
+        exam_date=goal.exam_date,
+        daily_hours=goal.daily_hours,
+        preferred_time=goal.preferred_time
+    )
+
+    db.add(new_goal)
+    db.commit()
+    db.refresh(new_goal)
+
     return {
-        "message": "Route Working!",
-        "goal": goal
+        "message": "Goal created successfully",
+        "goal_id": new_goal.id
     }
