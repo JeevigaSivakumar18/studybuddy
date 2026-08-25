@@ -1,64 +1,121 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
 
 function Signup() {
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+  });
+
+  const [message, setMessage] = useState("");
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.detail || "Signup failed");
+        return;
+      }
+
+      setMessage("Account created successfully!");
+      console.log(data);
+
+    } catch (error) {
+      setMessage("Unable to connect to server");
+    }
+  };
+
   return (
-    <div className="min-h-screen flex justify-center items-center bg-slate-100">
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
 
-      <div className="bg-white w-96 rounded-xl shadow-lg p-8">
+      <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-lg">
 
-        <h1 className="text-3xl font-bold text-center text-purple-700">
-          StudyBuddy
+        <h1 className="text-3xl font-bold text-indigo-700 text-center">
+          Create Account
         </h1>
 
-        <p className="text-center text-gray-500 mt-2 mb-8">
-          Create Account
+        <p className="text-gray-500 text-center mt-2 mb-8">
+          Start your personalized learning journey with StudyBuddy
         </p>
 
-        <input
-          type="text"
-          placeholder="Full Name"
-          className="w-full border p-3 rounded-lg mb-4 outline-none focus:border-purple-600"
-        />
+        <form onSubmit={handleSubmit}>
 
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full border p-3 rounded-lg mb-4 outline-none focus:border-purple-600"
-        />
+          <label className="block font-medium mb-2">
+            Full Name
+          </label>
 
-        <input
-          type="password"
-          placeholder="Password"
-          className="w-full border p-3 rounded-lg mb-4 outline-none focus:border-purple-600"
-        />
+          <input
+            type="text"
+            name="full_name"
+            value={formData.full_name}
+            onChange={handleChange}
+            placeholder="Enter your name"
+            className="w-full border rounded-lg p-3 mb-5"
+            required
+          />
 
-        <input
-          type="password"
-          placeholder="Confirm Password"
-          className="w-full border p-3 rounded-lg mb-6 outline-none focus:border-purple-600"
-        />
+          <label className="block font-medium mb-2">
+            Email
+          </label>
 
-        <button
-          className="w-full bg-purple-700 text-white p-3 rounded-lg hover:bg-purple-800 transition"
-        >
-          Create Account
-        </button>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="Enter your email"
+            className="w-full border rounded-lg p-3 mb-5"
+            required
+          />
 
-        <p className="text-center mt-5">
+          <label className="block font-medium mb-2">
+            Password
+          </label>
 
-          Already have an account?
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Create a password"
+            className="w-full border rounded-lg p-3 mb-6"
+            required
+          />
 
-          <Link
-            to="/"
-            className="text-purple-700 ml-2 font-semibold"
+          <button
+            type="submit"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold"
           >
-            Login
-          </Link>
+            Create Account
+          </button>
 
-        </p>
+        </form>
+
+        {message && (
+          <p className="text-center mt-5 text-gray-600">
+            {message}
+          </p>
+        )}
 
       </div>
-
     </div>
   );
 }
