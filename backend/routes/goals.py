@@ -2,43 +2,29 @@ from fastapi import APIRouter, Depends, Form, UploadFile, File
 from sqlalchemy.orm import Session
 from services.pdf_extractor import extract_text_from_pdf
 from services.topic_extractor import extract_topics
+from services.difficulty import assess_difficulty
+from services.study_plan import calculate_priorities, generate_roadmap
 from pathlib import Path
 from datetime import date
 import shutil
 
 from database import SessionLocal
 from models.goal import Goal
-
-from services.difficulty import assess_difficulty
-
+from models.roadmap_item import RoadmapItem
 
 router = APIRouter()
-
-
-# -----------------------------
-# Upload folder
-# -----------------------------
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 
-# -----------------------------
-# Database dependency
-# -----------------------------
-
 def get_db():
     db = SessionLocal()
-
     try:
         yield db
     finally:
         db.close()
 
-
-# -----------------------------
-# CREATE GOAL
-# -----------------------------
 
 @router.post("/goals")
 def create_goal(
@@ -51,47 +37,51 @@ def create_goal(
     db: Session = Depends(get_db)
 ):
 
-    # -----------------------------
     # Save uploaded syllabus
-    # -----------------------------
-
     filename = Path(syllabus.filename).name
-
     file_path = UPLOAD_DIR / filename
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(syllabus.file, buffer)
 
-    # -----------------------------
-    # Create database record
-    # -----------------------------
-
+    # Create goal record
     new_goal = Goal(
-        user_id=1,  # temporary user for testing
-
+        user_id=1,
         goal_name=goal_name,
         goal_type=goal_type,
         exam_date=exam_date,
         daily_hours=daily_hours,
         preferred_time=preferred_time,
-
         syllabus_file=str(file_path),
-
         progress=0
     )
-
-    # -----------------------------
-    # Save to MySQL
-    # -----------------------------
 
     db.add(new_goal)
     db.commit()
     db.refresh(new_goal)
 
+    # Extract text, topics, difficulty, priorities, and roadmap
     extracted_text = extract_text_from_pdf(str(file_path))
     topics = extract_topics(extracted_text)
+    difficulties = assess_difficulty(topics, extracted_text)
+    priorities = calculate_priorities(difficulties)
+    roadmap = generate_roadmap(priorities, exam_date, daily_hours)
 
-    difficulty = assess_difficulty(topics)
+    # Save roadmap items to database
+    for item in roadmap:
+        roadmap_item = RoadmapItem(
+            goal_id=new_goal.id,
+            topic=item["topic"],
+            difficulty=item["difficulty"],
+            priority_score=item["priority_score"],
+            start_day_offset=item["start_day_offset"],
+            end_day_offset=item["end_day_offset"],
+            daily_hours=item["daily_hours"],
+            status=item["status"]
+        )
+        db.add(roadmap_item)
+
+    db.commit()
 
     return {
         "message": "Goal created successfully",
@@ -99,22 +89,34 @@ def create_goal(
         "syllabus_file": str(file_path),
         "extracted_text": extracted_text,
         "topics": topics,
-        "difficulty": difficulty
-
+        "difficulties": difficulties,
+        "priorities": priorities,
+        "roadmap": roadmap
     }
 
 
-# -----------------------------
-# GET ALL GOALS
-# -----------------------------
-
 @router.get("/goals")
-def get_goals(
-    db: Session = Depends(get_db)
-):
-
-    goals = db.query(Goal).filter(
-        Goal.user_id == 1
-    ).all()
-
+def get_goals(db: Session = Depends(get_db)):
+    goals = db.query(Goal).filter(Goal.user_id == 1).all()
     return goals
+
+
+@router.get("/goals/{goal_id}/roadmap")
+def get_roadmap(goal_id: int, db: Session = Depends(get_db)):
+    items = db.query(RoadmapItem).filter(RoadmapItem.goal_id == goal_id).all()
+    return {
+        "goal_id": goal_id,
+        "roadmap": [
+            {
+                "id": item.id,
+                "topic": item.topic,
+                "difficulty": item.difficulty,
+                "priority_score": item.priority_score,
+                "start_day_offset": item.start_day_offset,
+                "end_day_offset": item.end_day_offset,
+                "daily_hours": item.daily_hours,
+                "status": item.status
+            }
+            for item in items
+        ]
+    }

@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from routes.goals import router as goals_router
 from routes.auth import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
+from models.roadmap_item import RoadmapItem
+
 
 app = FastAPI(
     title="StudyBuddy API",
