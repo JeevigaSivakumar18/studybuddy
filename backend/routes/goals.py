@@ -12,6 +12,8 @@ from database import SessionLocal
 from models.goal import Goal
 from models.roadmap_item import RoadmapItem
 
+from services.adaptive_scheduler import reschedule_roadmap
+
 router = APIRouter()
 
 UPLOAD_DIR = Path("uploads")
@@ -24,6 +26,29 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def recalculate_goal_progress(db: Session, goal_id: int):
+    """
+    Recalculate a goal's progress percentage based on completed roadmap items.
+    Called automatically whenever a roadmap item status changes.
+    """
+    total_items = db.query(RoadmapItem).filter(RoadmapItem.goal_id == goal_id).count()
+    if total_items == 0:
+        return
+
+    completed_items = (
+        db.query(RoadmapItem)
+        .filter(RoadmapItem.goal_id == goal_id, RoadmapItem.status == "completed")
+        .count()
+    )
+
+    progress_percent = int((completed_items / total_items) * 100)
+
+    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+    if goal:
+        goal.progress = progress_percent
+        db.commit()
 
 
 @router.post("/goals")
@@ -120,3 +145,65 @@ def get_roadmap(goal_id: int, db: Session = Depends(get_db)):
             for item in items
         ]
     }
+
+
+@router.patch("/goals/{goal_id}/roadmap/{item_id}")
+def update_roadmap_item_status(
+    goal_id: int,
+    item_id: int,
+    status: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Update the status of a single roadmap item.
+    Valid statuses: pending, in_progress, completed
+    Automatically recalculates the parent goal's progress.
+    """
+    valid_statuses = {"pending", "in_progress", "completed"}
+    if status not in valid_statuses:
+        return {"error": f"Invalid status. Must be one of: {valid_statuses}"}
+
+    item = (
+        db.query(RoadmapItem)
+        .filter(RoadmapItem.id == item_id, RoadmapItem.goal_id == goal_id)
+        .first()
+    )
+
+    if not item:
+        return {"error": "Roadmap item not found"}
+
+    item.status = status
+    db.commit()
+
+    # Recalculate overall goal progress
+    recalculate_goal_progress(db, goal_id)
+
+    return {
+        "message": "Status updated successfully",
+        "item_id": item_id,
+        "new_status": status
+    }
+
+@router.post("/goals/{goal_id}/reschedule")
+def reschedule_goal(goal_id: int, db: Session = Depends(get_db)):
+    """
+    Recalculate the study roadmap based on current progress and days remaining.
+    Completed topics stay fixed. Remaining topics get redistributed.
+    """
+    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+    if not goal:
+        return {"error": "Goal not found"}
+
+    items = db.query(RoadmapItem).filter(RoadmapItem.goal_id == goal_id).all()
+
+    # Run the rescheduling algorithm
+    updated_items = reschedule_roadmap(items, goal.exam_date)
+
+    # Save updated offsets back to the database
+    for item in updated_items:
+        db.add(item)
+
+    db.commit()
+
+    # Return the fresh roadmap
+    return get_roadmap(goal_id, db)

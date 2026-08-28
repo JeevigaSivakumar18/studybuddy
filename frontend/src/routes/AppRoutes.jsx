@@ -5,6 +5,7 @@ import Signup from "../pages/Signup";
 import Dashboard from "../pages/Dashboard";
 import AddGoal from "../pages/AddGoals";
 import Goals from "../pages/Goals";
+import StudyPlan from "../pages/StudyPlan";
 
 function AppRoutes() {
   return (
@@ -19,6 +20,8 @@ function AppRoutes() {
       <Route path="/addgoal" element={<AddGoal />} />
 
       <Route path="/goals" element={<Goals />} />
+
+      <Route path="/study-plan/:goalId" element={<StudyPlan />} />
 
     </Routes>
   );
