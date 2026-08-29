@@ -200,6 +200,7 @@ export default function StudyPlan() {
         </button>
 
         {/* Header */}
+                {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -208,19 +209,27 @@ export default function StudyPlan() {
                 {goalName || "Your Study Roadmap"}
               </h1>
               <p className="text-gray-500">
-                Track your progress topic by topic.
+                {progressPercent === 100
+                  ? "🎉 All topics completed! Great job!"
+                  : "Track your progress topic by topic."}
               </p>
             </div>
-            <button
-              onClick={handleReschedule}
-              disabled={rescheduling}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${rescheduling ? "animate-spin" : ""}`}
-              />
-              {rescheduling ? "Rescheduling..." : "Reschedule Plan"}
-            </button>
+            {progressPercent < 100 ? (
+              <button
+                onClick={handleReschedule}
+                disabled={rescheduling}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${rescheduling ? "animate-spin" : ""}`}
+                />
+                {rescheduling ? "Rescheduling..." : "Reschedule Plan"}
+              </button>
+            ) : (
+              <span className="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium">
+                ✅ Completed
+              </span>
+            )}
           </div>
         </div>
 
