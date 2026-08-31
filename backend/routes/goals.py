@@ -97,6 +97,10 @@ def create_goal(
 
     # Extract text (PDF or image)
     extracted_text = extract_text_from_file(str(file_path))
+    
+    # DEBUG: print first 500 chars to see what pypdf actually extracted
+    
+   
     topics = extract_topics(extracted_text)
     difficulties = assess_difficulty(topics, extracted_text)
     priorities = calculate_priorities(difficulties)

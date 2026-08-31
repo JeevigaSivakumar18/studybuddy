@@ -22,19 +22,23 @@ def calculate_priorities(topics_with_difficulty: list[dict]) -> list[dict]:
     return results
 
 
-def generate_roadmap(topics_with_priority: list[dict], exam_date: date, daily_hours: int) -> list[dict]:
+def generate_roadmap(topics_with_priority, exam_date, daily_hours) -> list[dict]:
     """
     Generate a day-by-day study roadmap.
-    Harder topics come first. Distributes days until exam date.
+    Harder topics come first. ALL topics are included.
     """
     today = date.today()
     days_until_exam = (exam_date - today).days if exam_date else 30
 
     if days_until_exam <= 0:
-        days_until_exam = 7  # fallback if exam is today or past
+        days_until_exam = 7
 
-    # Sort by priority score descending (hardest topics first)
-    sorted_topics = sorted(topics_with_priority, key=lambda x: x["priority_score"], reverse=True)
+    # Sort by priority descending (hardest topics first)
+    sorted_topics = sorted(
+        topics_with_priority,
+        key=lambda x: x["priority_score"],
+        reverse=True
+    )
 
     roadmap = []
     current_day = 0
@@ -42,9 +46,11 @@ def generate_roadmap(topics_with_priority: list[dict], exam_date: date, daily_ho
     for topic in sorted_topics:
         days_needed = topic["recommended_days"]
 
-        # Don't exceed available days
+        # If running out of days before exam, still give at least 1 day
         if current_day + days_needed > days_until_exam:
             days_needed = max(1, days_until_exam - current_day)
+            if days_needed <= 0:
+                days_needed = 1  # force 1 day even if past exam date
 
         start_offset = current_day
         end_offset = current_day + days_needed - 1
@@ -53,15 +59,12 @@ def generate_roadmap(topics_with_priority: list[dict], exam_date: date, daily_ho
             "topic": topic["topic"],
             "difficulty": topic["difficulty"],
             "priority_score": topic["priority_score"],
-            "start_day_offset": start_offset,      # 0 = today
+            "start_day_offset": start_offset,
             "end_day_offset": end_offset,
             "daily_hours": daily_hours,
             "status": "pending"
         })
 
         current_day += days_needed
-
-        if current_day >= days_until_exam:
-            break
 
     return roadmap

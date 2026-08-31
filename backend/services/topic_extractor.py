@@ -2,101 +2,85 @@ import re
 
 def extract_topics(text: str) -> list[str]:
     """
-    Extract topics from syllabus text.
-    Handles multiple formats:
-      - Unit - I Topic Name (same line)
-      - Unit – I\nTopic Name (next line)
-      - Chapter 1: Topic Name
-      - Module 1 - Topic Name
-      - 1. Topic Name
+    Extract unit topics from syllabus text.
+    Handles PDF line-break variations and different dash types.
     """
     topics = []
-    lines = [line.strip() for line in text.split("\n") if line.strip()]
     seen = set()
+
+    # Normalize all dash types to regular hyphen
+    text = text.replace("–", "-").replace("—", "-")
+
+    # Split into lines and clean
+    lines = [line.strip() for line in text.splitlines()]
 
     i = 0
     while i < len(lines):
         line = lines[i]
 
-        # ---- Pattern A: Single line unit ----
-        # "Unit - I Lexical Analysis" or "Unit–I Lexical Analysis"
-        single_match = re.match(
-            r"^(?:Unit|UNIT)\s*[-–]?\s*[IVX\d]+\s+(.+?)(?:\s+\d+\s*)?$",
-            line,
-            re.IGNORECASE
-        )
-        if single_match:
-            topic = _clean_topic(single_match.group(1))
-            if topic and topic not in seen:
-                topics.append(topic)
-                seen.add(topic)
+        # Pattern 1: Unit header on its own line
+        # "Unit - I" or "Unit-I" or "UNIT I"
+        if re.match(r"^(Unit|UNIT)\s*[-]?\s*[IVX]+\s*$", line, re.IGNORECASE):
+            # Look at next lines for the topic
+            for j in range(i + 1, min(i + 4, len(lines))):
+                candidate = lines[j].strip()
+
+                # Skip empty lines
+                if not candidate:
+                    continue
+
+                # Skip pure numbers like "9" (credit hours)
+                if candidate.isdigit():
+                    continue
+
+                # Skip lines that start with lowercase (descriptions)
+                if candidate[0].islower():
+                    continue
+
+                # Skip very long lines (paragraphs, not titles)
+                if len(candidate) > 80:
+                    continue
+
+                # Skip known non-topics
+                skip_words = [
+                    "Introduction", "Overview", "Kongu", "B.E.", "Programme",
+                    "Sem.", "CO", "Course", "TEXT", "REFERENCES", "Total",
+                    "COURSEOUTCOMES", "Test", "CAT", "ESE", "Preamble",
+                    "Page", "Footer", "Header", "B.E.–Computer",
+                ]
+                if any(candidate.startswith(sw) for sw in skip_words):
+                    continue
+
+                # Clean trailing numbers and punctuation
+                topic = re.sub(r"\s+\d+$", "", candidate)
+                topic = re.sub(r"[\.:;]+$", "", topic)
+
+                if topic and len(topic) > 2 and topic not in seen:
+                    topics.append(topic)
+                    seen.add(topic)
+                break
+
             i += 1
             continue
 
-        # ---- Pattern B: Multi-line unit ----
-        # "Unit – I" on one line, "Lexical Analysis" on the next
-        multi_header = re.match(
-            r"^(?:Unit|UNIT)\s*[-–]?\s*[IVX\d]+\s*$",
+        # Pattern 2: Unit and topic on SAME line
+        # "Unit - I Lexical Analysis" or "Unit-I Lexical Analysis"
+        same_line = re.match(
+            r"^(Unit|UNIT)\s*[-]?\s*[IVX]+\s+(.+)$",
             line,
-            re.IGNORECASE
+            re.IGNORECASE,
         )
-        if multi_header and i + 1 < len(lines):
-            next_line = lines[i + 1]
+        if same_line:
+            topic = same_line.group(2).strip()
+            topic = re.sub(r"\s+\d+$", "", topic)
+            topic = re.sub(r"[\.:;]+$", "", topic)
 
-            # Skip if next line is just a number (hours/credits like "9")
-            if re.match(r"^\d+$", next_line):
+            # Skip if it looks like a description
+            if len(topic) > 80:
                 i += 1
                 continue
 
-            # Skip if next line looks like another header or section
-            skip_patterns = [
-                r"^(Unit|Chapter|Module|CO\d|Course|TEXT|REFERENCES|Total|Programme|Sem\.|Preamble|B\.E\.|COURSEOUTCOMES|Test/Bloom)",
-                r"^(Introduction|Overview|Conclusion|Summary)$",
-            ]
-            if any(re.match(p, next_line, re.IGNORECASE) for p in skip_patterns):
-                i += 1
-                continue
-
-            topic = _clean_topic(next_line)
             if topic and len(topic) > 2 and topic not in seen:
-                topics.append(topic)
-                seen.add(topic)
-            i += 2
-            continue
-
-        # ---- Pattern C: Chapter ----
-        chapter_match = re.match(
-            r"^(?:Chapter|CHAPTER|Ch)\s*[-–]?\s*\d+\s*[-–:.]?\s*(.+)$",
-            line,
-            re.IGNORECASE
-        )
-        if chapter_match:
-            topic = _clean_topic(chapter_match.group(1))
-            if topic and topic not in seen:
-                topics.append(topic)
-                seen.add(topic)
-            i += 1
-            continue
-
-        # ---- Pattern D: Module ----
-        module_match = re.match(
-            r"^(?:Module|MODULE|Mod)\s*[-–]?\s*\d+\s*[-–:.]?\s*(.+)$",
-            line,
-            re.IGNORECASE
-        )
-        if module_match:
-            topic = _clean_topic(module_match.group(1))
-            if topic and topic not in seen:
-                topics.append(topic)
-                seen.add(topic)
-            i += 1
-            continue
-
-        # ---- Pattern E: Numbered heading (1. Introduction) ----
-        numbered_match = re.match(r"^\d+(?:\.\d+)?\s+([A-Z][A-Za-z\s\-]+)$", line)
-        if numbered_match:
-            topic = _clean_topic(numbered_match.group(1))
-            if topic and topic not in seen:
                 topics.append(topic)
                 seen.add(topic)
             i += 1
@@ -105,15 +89,3 @@ def extract_topics(text: str) -> list[str]:
         i += 1
 
     return topics
-
-
-def _clean_topic(raw: str) -> str:
-    """Clean up extracted topic text."""
-    topic = raw.strip()
-    # Remove trailing numbers (like "Lexical Analysis 9")
-    topic = re.sub(r"\s+\d+\s*$", "", topic)
-    # Remove trailing punctuation
-    topic = re.sub(r"[\.:;]+$", "", topic)
-    # Remove "Introduction –" or similar prefixes
-    topic = re.sub(r"^Introduction\s*[-–]\s*", "", topic, flags=re.IGNORECASE)
-    return topic
